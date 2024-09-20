@@ -1,0 +1,26 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.7.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "form-data": "^4.0.0",
+    "openai": "^4.62.1",
+    "replicate": "^0.33.0",
+    "sharp": "^0.33.5"
+  },
+  "description": "",
+  "devDependencies": {
+    "nodemon": "^3.1.6"
+  }
+}
