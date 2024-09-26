@@ -12,10 +12,13 @@
   "dependencies": {
     "axios": "^1.7.7",
     "cors": "^2.8.5",
+    "crypto": "^1.0.1",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "form-data": "^4.0.0",
-    "openai": "^4.62.1",
+    "fs": "^0.0.1-security",
+    "openai": "^4.63.0",
+    "path": "^0.12.7",
     "replicate": "^0.33.0",
     "sharp": "^0.33.5"
   },
