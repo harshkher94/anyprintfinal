@@ -14,7 +14,7 @@ async function generateImage(prompt) {
 
   try {
     const output = await replicate.run(
-      "black-forest-labs/flux-schnell",
+      "black-forest-labs/flux-dev",
       { input }
     );
 

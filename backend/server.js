@@ -3,13 +3,24 @@ const express = require('express');
 const cors = require('cors');
 const { refinePrompt } = require('./services/promptRefinement');
 const { generateImage } = require('./services/imageGeneration');
-const { createPrintifyProduct } = require('./services/printifyService');
+const { createPrintifyProduct, fetchAvailableColors } = require('./services/printifyService');
+const { getTshirtColors } = require('./config');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
+
+app.get('/api/available-colors', async (req, res) => {
+  try {
+    const colors = getTshirtColors();
+    res.json(colors);
+  } catch (error) {
+    console.error('Error fetching available colors:', error);
+    res.status(500).json({ error: 'An error occurred while fetching available colors' });
+  }
+});
 
 app.post('/api/generate-tshirt-design', async (req, res) => {
   try {
@@ -40,13 +51,19 @@ app.post('/api/generate-tshirt-design', async (req, res) => {
       originalPrompt: prompt,
       refinedPrompt: refinedPrompt,
       suggestedColor: suggestedColor,
+      selectedColor: printifyProduct.selectedColor,
       generatedImageUrl: imageUrl,
       printifyMockupUrl: frontMockupUrl,
       printifyProductId: printifyProduct.id
     });
   } catch (error) {
     console.error('Error in generate-tshirt-design:', error);
-    res.status(500).json({ error: 'An error occurred while generating the t-shirt design', details: error.message });
+    const errorMessage = error.response ? JSON.stringify(error.response.data, null, 2) : error.message;
+    res.status(500).json({ 
+      error: 'An error occurred while generating the t-shirt design', 
+      details: errorMessage,
+      stack: error.stack
+    });
   }
 });
 

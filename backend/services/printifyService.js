@@ -1,5 +1,6 @@
 const axios = require('axios');
 const path = require('path');
+const { updateTshirtColors } = require('../config');
 
 const PRINTIFY_API_TOKEN = process.env.PRINTIFY_API_TOKEN;
 
@@ -27,14 +28,31 @@ async function uploadImageToPrintify(imageUrl) {
 }
 
 async function getShopId() {
-  const response = await axios.get('https://api.printify.com/v1/shops.json', {
-    headers: { 'Authorization': `Bearer ${PRINTIFY_API_TOKEN}` }
-  });
-  if (response.data && response.data.length > 0) {
-    return response.data[0].id;
-  } else {
+  try {
+    const response = await axios.get('https://api.printify.com/v1/shops.json', {
+      headers: { 'Authorization': `Bearer ${PRINTIFY_API_TOKEN}` }
+    });
+    if (response.data && response.data.length > 0) {
+      return response.data[0].id;
+    }
     throw new Error('No shops found');
+  } catch (error) {
+    console.error('Error fetching shop ID:', error.response ? error.response.data : error.message);
+    throw error;
   }
+}
+
+async function fetchAvailableColors(blueprintId, providerId) {
+  const response = await axios.get(
+    `https://api.printify.com/v1/catalog/blueprints/${blueprintId}/print_providers/${providerId}/variants.json`,
+    {
+      headers: { 'Authorization': `Bearer ${PRINTIFY_API_TOKEN}` }
+    }
+  );
+
+  const colors = [...new Set(response.data.variants.map(variant => variant.options.color))];
+  updateTshirtColors(colors);
+  return colors;
 }
 
 async function createPrintifyProduct(imageUrl, description, suggestedColor) {
@@ -73,6 +91,31 @@ async function createPrintifyProduct(imageUrl, description, suggestedColor) {
     const firstProvider = providersResponse.data[0];
     console.log('Using print provider:', firstProvider.title, 'ID:', firstProvider.id);
 
+    console.log('Fetching variant options...');
+    const variantOptionsResponse = await axios.get(
+      `https://api.printify.com/v1/catalog/blueprints/${tshirtBlueprint.id}/print_providers/${firstProvider.id}/variants.json`,
+      {
+        headers: { 'Authorization': `Bearer ${PRINTIFY_API_TOKEN}` }
+      }
+    );
+
+    const availableColors = [...new Set(variantOptionsResponse.data.variants.map(variant => variant.options.color))];
+    console.log('Available colors:', availableColors);
+
+    let colorVariant;
+    if (suggestedColor && availableColors.includes(suggestedColor)) {
+      colorVariant = variantOptionsResponse.data.variants.find(variant => 
+        variant.options.color.toLowerCase() === suggestedColor.toLowerCase()
+      );
+    }
+    
+    if (!colorVariant) {
+      console.log('Suggested color not found or not provided, using default');
+      colorVariant = variantOptionsResponse.data.variants[0];
+    }
+
+    console.log('Selected color:', colorVariant.options.color);
+
     const productData = {
       title: "Custom T-Shirt Design",
       description: description,
@@ -80,14 +123,14 @@ async function createPrintifyProduct(imageUrl, description, suggestedColor) {
       print_provider_id: firstProvider.id,
       variants: [
         {
-          id: 78061,  // This will be updated later
+          id: colorVariant.id,
           price: 2000,
           is_enabled: true
         }
       ],
       print_areas: [
         {
-          variant_ids: [78061],  // This will be updated later
+          variant_ids: [colorVariant.id],
           placeholders: [
             {
               position: "front",
@@ -106,43 +149,24 @@ async function createPrintifyProduct(imageUrl, description, suggestedColor) {
       ]
     };
 
-    console.log('Fetching variant options...');
-    const variantOptionsResponse = await axios.get(
-      `https://api.printify.com/v1/catalog/blueprints/${tshirtBlueprint.id}/print_providers/${firstProvider.id}/variants.json`,
-      {
-        headers: { 'Authorization': `Bearer ${PRINTIFY_API_TOKEN}` }
-      }
-    );
-
-    let colorVariant;
-    if (suggestedColor) {
-      colorVariant = variantOptionsResponse.data.variants.find(variant => 
-        variant.options.color.toLowerCase() === suggestedColor.toLowerCase()
-      );
-    }
-    
-    if (colorVariant) {
-      console.log('Color variant found:', colorVariant.id);
-      productData.variants[0].id = colorVariant.id;
-      productData.print_areas[0].variant_ids = [colorVariant.id];
-    } else {
-      console.log('Suggested color not found or not provided, using default');
-      productData.variants[0].id = variantOptionsResponse.data.variants[0].id;
-      productData.print_areas[0].variant_ids = [variantOptionsResponse.data.variants[0].id];
-    }
+    console.log('Creating product with data:', JSON.stringify(productData, null, 2));
 
     const shopId = await getShopId();
-    console.log('Creating product on Printify...');
+    console.log('Creating product for shop ID:', shopId);
+
     const response = await axios.post(`https://api.printify.com/v1/shops/${shopId}/products.json`, productData, {
       headers: { 'Authorization': `Bearer ${PRINTIFY_API_TOKEN}` }
     });
 
     console.log('Product created successfully');
-    return response.data;
+    return {
+      ...response.data,
+      selectedColor: colorVariant.options.color
+    };
   } catch (error) {
     console.error('Error in createPrintifyProduct:', error.response ? error.response.data : error.message);
     throw error;
   }
 }
 
-module.exports = { createPrintifyProduct };
+module.exports = { createPrintifyProduct, fetchAvailableColors };
